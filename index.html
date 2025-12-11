@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prototype - Monitoring System</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background-color: #d6ffad;
+    }
+
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 200px;
+      height: 100%;
+      background-color: #1db954;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      padding-top: 20px;
+    }
+    .sidebar h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .sidebar a {
+      text-decoration: none;
+      color: white;
+      padding: 15px;
+      display: block;
+      text-align: center;
+      cursor: pointer;
+    }
+    .sidebar a:hover, .sidebar a.active {
+      background-color: #14833b;
+    }
+
+    .content {
+      margin-left: 200px;
+      padding: 20px;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .card {
+      background: white;
+      padding: 15px;
+      margin: 10px;
+      border-radius: 8px;
+      flex: 1;
+      min-width: 280px;
+      text-align: left;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    table, th, td {
+      border: 1px solid #ccc;
+    }
+    th, td {
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #1db954;
+      color: white;
+    }
+
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+    }
+    .table-container table {
+      min-width: 700px;
+    }
+
+    .circle-wrapper {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .circle-container {
+      margin: 0 auto;
+      position: relative;
+      width: 120px;
+      height: 120px;
+    }
+    .circle-svg {
+      transform: rotate(-90deg);
+    }
+    .circle-bg {
+      fill: none;
+      stroke: #eee;
+      stroke-width: 12;
+    }
+    .circle {
+      fill: none;
+      stroke: #1db954;
+      stroke-width: 12;
+      stroke-linecap: round;
+      stroke-dasharray: 0 100;
+      transition: stroke-dasharray 1.5s ease-in-out;
+    }
+    .circle-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .gauge-row {
+      display: flex;
+      align-items: center;
+      margin: 6px 0;
+    }
+    .gauge-row p {
+      width: 80px;
+      margin: 0;
+    }
+    .gauge-container {
+      flex: 1;
+      background: #ddd;
+      border-radius: 20px;
+      height: 20px;
+      overflow: hidden;
+      margin-left: 10px;
+    }
+    .gauge-fill {
+      height: 100%;
+      width: 0;
+      background: #1db954;
+      border-radius: 20px;
+      transition: width 1.5s ease-in-out;
+      text-align: right;
+      padding-right: 5px;
+      box-sizing: border-box;
+      color: white;
+      font-size: 11px;
+      line-height: 20px;
+    }
+
+    section {
+      display: none;
+      opacity: 0;
+    }
+    section.active {
+      display: block;
+      animation: fadeIn 0.5s forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    button {
+      background-color: #1db954;
+      color: white;
+      padding: 10px 15px;
+      margin: 8px 5px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background-color: #14833b;
+    }
+
+    @media (max-width: 768px) {
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: auto;
+        flex-direction: row;
+        justify-content: space-around;
+        padding: 10px 0;
+        z-index: 1000;
+      }
+      .sidebar h2 {
+        display: none;
+      }
+      .sidebar a {
+        flex: 1;
+        padding: 10px;
+        font-size: 14px;
+      }
+      .content {
+        margin-left: 0;
+        margin-top: 60px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <h2>Menu</h2>
+    <a class="tablink active" data-target="overview">Overview</a>
+    <a class="tablink" data-target="records">Records</a>
+    <a class="tablink" data-target="manual">Manual Control</a>
+  </div>
+
+  <div class="content">
+    <h1>Prototype - Monitoring System</h1>
+
+    <!-- Overview -->
+    <section id="overview" class="active">
+      <div class="row">
+        <div class="card">
+          <h3>Initial Water Tank</h3>
+          <div class="circle-wrapper">
+            <div class="circle-container">
+              <svg class="circle-svg" width="120" height="120">
+                <circle class="circle-bg" cx="60" cy="60" r="50"></circle>
+                <circle id="initial_circle" class="circle" cx="60" cy="60" r="50"></circle>
+              </svg>
+              <div id="initial_text" class="circle-text">0%</div>
+            </div>
+          </div>
+          <div class="gauge-row">
+            <p>pH</p>
+            <div class="gauge-container"><div id="initial_pH" class="gauge-fill">0</div></div>
+          </div>
+          <div class="gauge-row">
+            <p>Turbidity</p>
+            <div class="gauge-container"><div id="initial_turb" class="gauge-fill">0</div></div>
+          </div>
+          <div class="gauge-row">
+            <p>TDS</p>
+            <div class="gauge-container"><div id="initial_tds" class="gauge-fill">0</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Potable Water Tank</h3>
+          <div class="circle-wrapper">
+            <div class="circle-container">
+              <svg class="circle-svg" width="120" height="120">
+                <circle class="circle-bg" cx="60" cy="60" r="50"></circle>
+                <circle id="potable_circle" class="circle" cx="60" cy="60" r="50"></circle>
+              </svg>
+              <div id="potable_text" class="circle-text">0%</div>
+            </div>
+          </div>
+          <div class="gauge-row">
+            <p>pH</p>
+            <div class="gauge-container"><div id="potable_pH" class="gauge-fill">0</div></div>
+          </div>
+          <div class="gauge-row">
+            <p>Turbidity</p>
+            <div class="gauge-container"><div id="potable_turb" class="gauge-fill">0</div></div>
+          </div>
+          <div class="gauge-row">
+            <p>TDS</p>
+            <div class="gauge-container"><div id="potable_tds" class="gauge-fill">0</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="card chart" id="prediction-card">
+          <h3>Water Potability Prediction</h3>
+          <div style="text-align:center; padding:20px;">
+            <h2 id="prediction-label" style="font-size: 28px; color: #14833b;">Loading...</h2>
+            <p><strong>pH:</strong> <span id="pred_ph">--</span></p>
+            <p><strong>Turbidity:</strong> <span id="pred_turb">--</span></p>
+            <p><strong>TDS:</strong> <span id="pred_tds">--</span></p>
+          </div>
+        </div>
+        <div class="card report">
+          <h3>Process Report</h3>
+          <div class="table-container">
+            <table id="statusTable">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Process</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="statusBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Records -->
+    <section id="records">
+      <h2>Records</h2>
+      <div class="row">
+        <div class="card">
+          <h3>Daily Records</h3>
+          <div class="table-container">
+            <table id="records-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Avg. Water Produced (mL)</th>
+                  <th>Avg. pH</th>
+                  <th>Avg. Turbidity</th>
+                  <th>Avg. TDS</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Manual -->
+    <section id="manual">
+      <h2>Manual Control</h2>
+      <div class="card">
+        <h3>Disclaimer</h3>
+        <p>
+          Manual control is for testing, maintenance, or emergencies. It overrides automatic processes and may affect water quality or equipment. Only trained personnel should operate it.
+        </p>
+      </div>
+      <div class="card">
+        <button onclick="sendCommand('inactive')">Stop Current Process</button>
+        <button onclick="sendCommand('ro_on')">Activate RO Pump</button>
+        <button onclick="sendCommand('refill_on')">Activate UV + Main Pump</button>
+        <button onclick="sendCommand('auto')">Resume Auto Mode</button>
+        <p><strong>Status:</strong> <span id="processStatus">Inactive</span></p>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    let waterChart;
+
+    const tabs = document.querySelectorAll(".tablink");
+    const sections = document.querySelectorAll("section");
+    tabs.forEach(tab => {
+      tab.addEventListener("click", () => {
+        tabs.forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+        sections.forEach(sec => sec.classList.remove("active"));
+        const target = tab.getAttribute("data-target");
+        document.getElementById(target).classList.add("active");
+      });
+    });
+
+    // --- Manual Control Functions ---
+    function setManualActivation() {
+      fetch("/set_status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "Treatment Process" })
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("processStatus").innerText = data.status;
+      })
+      .catch(err => console.error(err));
+    }
+
+    function sendCommand(cmd) {
+      fetch("/set_status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: cmd })
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("processStatus").innerText = data.status;
+      })
+      .catch(err => console.error("Command failed:", err));
+    }
+
+
+    function activateUVMain() {
+      fetch("/set_status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "Manual UV + Main Pump" })
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("processStatus").innerText = data.status;
+      })
+      .catch(err => console.error(err));
+    }
+
+    function activateRO() {
+      fetch("/set_status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "Manual RO Pump" })
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("processStatus").innerText = data.status;
+      })
+      .catch(err => console.error(err));
+    }
+
+
+    function setInactive() {
+      fetch("/set_status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "Inactive" })
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("processStatus").innerText = data.status;
+      })
+      .catch(err => console.error(err));
+    }
+
+    function setAutoMode() {
+      fetch("/set_status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "Auto Mode" })
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("processStatus").innerText = data.status;
+      })
+      .catch(err => console.error(err));
+    }
+
+    async function refreshStatus() {
+      try {
+        const res = await fetch("/get_status");
+        const data = await res.json();
+        document.getElementById("processStatus").innerText = data.status;
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function loadData() {
+      try {
+        const response = await fetch("/api/readings");
+        const data = await response.json();
+
+        const initialTankPercent = (parseFloat(data.initial_tank) || 0).toFixed(0);
+        updateCircle("initial_circle", "initial_text", initialTankPercent);
+        updateGauge("initial_pH", (parseFloat(data.initial_P) || 0) / 14 * 100, data.initial_P);
+        updateGauge("initial_turb", (parseFloat(data.initial_turb) || 0) / 100 * 100, data.initial_turb);
+        updateGauge("initial_tds", (parseFloat(data.initial_tds) || 0) / 500 * 100, data.initial_tds);
+
+        const potableTankPercent = (parseFloat(data.potable_tank) || 0).toFixed(0);
+        updateCircle("potable_circle", "potable_text", potableTankPercent);
+        updateGauge("potable_pH", (parseFloat(data.potable_pH) || 0) / 14 * 100, data.potable_pH);
+        updateGauge("potable_turb", (parseFloat(data.potable_turb) || 0) / 100 * 100, data.potable_turb);
+        updateGauge("potable_tds", (parseFloat(data.potable_tds) || 0) / 500 * 100, data.potable_tds);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function loadProcessReport() {
+      try {
+        const response = await fetch("/api/status");
+        const rows = await response.json();
+        console.log(rows);
+        const tbody = document.getElementById("statusBody");
+        tbody.innerHTML = "";
+        rows.forEach(row => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${row.Time}</td>
+            <td>${row.Process}</td>
+            <td>${row.Status}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function loadRecords() {
+      try {
+        const response = await fetch("/api/records");
+        const rows = await response.json();
+        console.log("Fetched rows:", rows); // Debug log
+
+        const tableBody = document.querySelector("#records-table tbody");
+        tableBody.innerHTML = "";
+
+        rows.forEach(row => {
+          console.log("Row data:", row); // Debug log
+
+          const tr = document.createElement("tr");
+
+          // Explicitly map keys
+          const date = row["Date"] || "";
+          const water = row["Avg. Water Produced (mL)"] || "";
+          const ph = row["Avg. pH"] || "";
+          const turbidity = row["Avg. Turbidity"] || "";
+          const tds = row["Avg. TDS"] || "";
+
+          tr.innerHTML = `
+            <td>${date}</td>
+            <td>${water}</td>
+            <td>${ph}</td>
+            <td>${turbidity}</td>
+            <td>${tds}</td>
+          `;
+
+          tableBody.appendChild(tr);
+        });
+      } catch (error) {
+        console.error("Error loading records:", error);
+      }
+    }
+    
+    async function loadPrediction() {
+      try {
+        const response = await fetch("/api/predict");
+        const result = await response.json();
+
+        // Update text fields
+        document.getElementById("pred_ph").innerText = result.pH?.toFixed(2);
+        document.getElementById("pred_turb").innerText = result.Turbidity?.toFixed(2);
+        document.getElementById("pred_tds").innerText = result.TDS?.toFixed(2);
+
+        const label = document.getElementById("prediction-label");
+        if (result.Prediction === 1) {
+          label.innerText = "POTABLE ✅";
+          label.style.color = "#1db954"; // green
+        } else if (result.Prediction === 0) {
+          label.innerText = "NOT POTABLE ⚠️";
+          label.style.color = "#d9534f"; // red
+        } else {
+          label.innerText = "No Data";
+          label.style.color = "#999";
+        }
+      } catch (err) {
+        console.error("Prediction fetch failed:", err);
+        document.getElementById("prediction-label").innerText = "Error fetching prediction";
+        document.getElementById("prediction-label").style.color = "#999";
+      }
+    }
+    
+
+    function updateCircle(circleId, textId, percent) {
+      const circle = document.getElementById(circleId);
+      const text = document.getElementById(textId);
+      const radius = circle.r.baseVal.value;
+      const circumference = 2 * Math.PI * radius;
+      circle.style.strokeDasharray = `${(percent / 100) * circumference} ${circumference}`;
+      text.innerText = percent + "%";
+    }
+
+    function updateGauge(id, percent, label = null) {
+      const gauge = document.getElementById(id);
+      gauge.style.width = percent + "%";
+      gauge.innerText = label !== null ? label : percent + "%";
+    }
+    
+    loadPrediction();
+
+    // Auto-refresh every 3s
+    setInterval(() => {
+      loadData();
+      loadProcessReport();
+      loadRecords();
+      loadPrediction(); // <---- added line
+      refreshStatus();
+    }, 3000);
+
+
+    // Initial load
+    loadData();
+    loadProcessReport();
+    loadRecords();
+    refreshStatus();
+  </script>
+</body>
+</html>
